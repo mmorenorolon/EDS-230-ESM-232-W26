@@ -1,0 +1,88 @@
+---
+title: "almond_yield_assignment"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+```
+
+```{r}
+#read in climate data
+clim <- read.csv(here("Data", "clim.txt"), sep = "")
+```
+
+```{r}
+#calculate the mean temperature for each year
+#clim$tmean_c <- (clim$tmin_c + clim$tmax_c) / 2
+
+almond_yield <- function(clim = clim, tmin = c(-0.015, -0.0046), 
+                         precip = c(-0.07, 0.0043), 
+                         int = 0.28) {
+  yield_year <- clim %>% 
+  group_by(year) %>% 
+  summarize(
+      # February mean daily minimum temp (C)
+      Tn2 = mean(tmin_c[month == 2], na.rm = TRUE),
+
+      # January total precipitation (mm)
+      P1  = sum(precip[month == 1], na.rm = TRUE),
+      .groups = "drop") %>% 
+  
+# Lobell almond model - yield anomaly (ton/acre)
+  mutate(yield_anom = (b_tn2 * Tn2) + (b_tn2_sq * Tn2 ^ 2) + 
+  (b_p1 * P1) + (b_p1_sq * P1 ^ 2) + int) %>% 
+  arrange(year) 
+
+y <- yield_year$yield_anom  
+
+yield_summ <- yield_year %>% 
+  summarize(
+    max  = max(y, na.rm = TRUE),
+    min  = min(y, na.rm = TRUE),
+    mean = mean(y, na.rm = TRUE)
+  )
+
+return(yield_summ)
+
+kable(yield_summ, digits = 2) %>% 
+  kable_styling(latex_options = "striped")
+
+}
+
+test2 <- almond_yield(clim = clim) 
+
+
+yield_year <- clim %>% 
+  group_by(year) %>% 
+  summarize(
+      # February mean daily minimum temp (C)
+      Tn2 = mean(tmin_c[month == 2], na.rm = TRUE),
+
+      # January total precipitation (mm)
+      P1  = sum(precip[month == 1], na.rm = TRUE),
+      .groups = "drop") %>% 
+  
+# Lobell almond model - yield anomaly (ton/acre)
+  mutate(yield_anom = (-0.015 * Tn2) + (-0.0046 * Tn2 ^ 2) + 
+  (-0.07 * P1) + (0.0043 * P1 ^ 2) + 0.28) %>% 
+  arrange(year) 
+
+y <- yield_year$yield_anom  
+
+yield_summ <- yield_year %>% 
+  summarize(
+    max  = max(y, na.rm = TRUE),
+    min  = min(y, na.rm = TRUE),
+    mean = mean(y, na.rm = TRUE)
+  )
+
+library(kableExtra)  
+
+kable(yield_summ, digits = 2) %>% 
+  kable_styling(latex_options = "striped")
+
+```
+
