@@ -1,0 +1,113 @@
+---
+title: "almond_profit_model"
+author: "Melannie Moreno Rolón"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+Profit = Revenue - Cost 
+Revenue = yield * price
+
+Cost = fixed value that accounts for the labor + water req. 
+Cost = fixed costs + variable costs
+Determine whether price will be a constant value
+
+Other expression for profit
+- total profit = unit price × quantity - unit cost × quantity.
+
+```{r}
+library(tidyverse)
+library(here)
+```
+
+Average price of almonds $1.99 per pound, or $3,980 per ton.
+
+Operating Cost = $3,807 (2024)
+
+Make the conversion of almond price per pound.
+
+```{r}
+source(here::here("my-work", "almond_yield.R"))
+
+yield <- almond_yield(tmin_c = tmin_c, precip = precip)
+
+price_pound <- 1.99
+price_ton <- price_pound * 2000
+
+revenue <- price_ton * yield
+
+cost_acre <- 3807
+
+profit <- revenue - cost_acre
+
+profit
+
+```
+
+```{r}
+source(here::here("my-work","almond_profit.R"))
+
+```
+
+
+Start Sensitivity Analysis
+
+```{r}
+nsamples <- 400
+deviation <- 0.15
+base_thresh <- 20000
+ethresh <- runif(
+  min = base_thresh - deviation * base_thresh,
+  max = base_thresh + deviation * base_thresh, n = nsamples
+)
+
+eff <- rnorm(mean = 0.6, sd = 0.1, n = nsamples)
+
+# put samples together
+parms <- cbind.data.frame(eff, ethresh)
+
+# use pmap
+# takes function name and then names of all parameters that don't change
+results <- parms %>% pmap(solarpv,
+  area = 20,
+  solar = sierraczosolar, clr = "green",
+  eunit = "kWhr", g = FALSE, etype = "direct"
+)
+
+results[[1]]
+length(results)
+
+# now we can extract results from the list as above
+mean_elect <- map_df(results, `[`, c("mean"))
+# and we can add the parameter values for each run
+mean_elect <- cbind.data.frame(mean_elect, parms)
+
+
+
+```
+
+## Looking at results {.scrollable}
+
+Lets start with mean annual electricity
+
+We want to look at:
+
+1) uncertainty in output due to both parameters 
+2) how each parameter influences the results
+
+```{r plot_sensitivity, echo=TRUE}
+# plot - pick one of the 2 parameter as a color
+# try switching which parameter used for color
+
+p1 <- ggplot(mean_elect, aes(ethresh, mean, col = eff)) +
+  geom_point(cex = 2) +
+  labs(y = "Mean Annual Electricity kWhr/yr", x = "Threshold Radiation (kJ/m2)  \n above which energy production is more efficient")
+p1
+
+p2 <- ggplot(mean_elect, aes(eff, mean, col = ethresh)) +
+  geom_point(cex = 2) +
+  labs(y = "Mean Annual Electricity kWhr/yr", x = "Efficiency")
+p2
+```
+
