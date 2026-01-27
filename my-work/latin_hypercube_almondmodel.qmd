@@ -12,7 +12,7 @@ library(here)
 ```
 
 ```{r}
-source(here("R",  "compute_almond_yield.R"))
+source(here("R", "compute_almond_yield.R"))
 ```
 
 Define quantiles for each parameter to sample
