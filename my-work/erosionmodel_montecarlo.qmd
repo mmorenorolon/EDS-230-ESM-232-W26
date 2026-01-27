@@ -1,0 +1,56 @@
+---
+title: "erosion_model"
+format: html
+---
+
+Informal Sensitivity Analysis - Random Monte Carlo
+
+```{r}
+library(tidyverse)
+```
+
+
+I = rainfall intensity
+f = soil infiltration capacity
+
+Q = {0, I <= f;
+    (I-f)^k, I > f}
+    
+    k = control of how sharp the runoff increases beyond the threshold
+    
+```{r}
+# fetch erosion model
+source(here::here("R" , "simple_erosion.R"))
+
+# first run with best guess for the infiltration capacity of 2 mm/hr
+simple_erosion(I=2,f=4)
+```
+```{r}
+f <- rnorm(n=10, mean=5, sd=2)
+```
+  
+```{r}
+estimate <- map(f, ~simple_erosion(I=2,f=.x)) %>% 
+  unlist()
+
+estimate
+```
+```{r}
+#What is the probability
+pnorm(1.5, mean=5, sd=2)
+```
+```{r}
+simple_erosion(I=2,f=1.5)
+```
+```{r}
+pnorm(0.5, mean=5, sd=2)
+```
+```{r}
+simple_erosion(I=2, f=0.5)
+```
+```{r}
+# Larger sample
+f <- rnorm(n=100, mean=5, sd=2)
+```
+
+  

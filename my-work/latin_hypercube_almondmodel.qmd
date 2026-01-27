@@ -1,0 +1,108 @@
+---
+title: "Latin Hypercube Almond Model"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(lhs)
+library(tidyverse)
+library(here)
+```
+
+```{r}
+source(here("R",  "compute_almond_yield.R"))
+```
+
+Define quantiles for each parameter to sample
+```{r}
+set.seed(1)
+compute_almond_yield()
+#make a vector of all the parameters we are going to vary
+# how many parameters (we need a list of their names)
+pnames <- c("Tmincoeff1", "Tmincoeff2", "Pcoeff1", "Pcoeff2", "intercept")
+
+npar <- length(pnames)
+nsample <- 100
+
+#create hypercube quantiles for each parameter
+parmquant<- randomLHS(nsample, npar)
+parmquant #array
+
+parm <- as.data.frame(matrix(nrow = nrow(parmquant), ncol = ncol(parmquant))) 
+
+colnames(parmquant) <- pnames
+
+# standard deviation 15%
+pvar <- 15
+
+parm[, "Tmincoeff1"] <- qnorm(parmquant[, "Tmincoeff1"], mean = -0.015, sd = 0.015 / pvar)
+
+# Repeat the above for all other parameters
+parm[, "Tmincoeff2"] <- qnorm(parmquant[, "Tmincoeff2"], mean = -0.00846, 
+                                        sd = -0.00846 / pvar)
+
+
+```
+
+```{r}
+# Read in climate data
+read.table(here("data", "clim.txt"))
+
+parm <- parm %>% pmap(compute_almond_yield, clim=clim) 
+
+# Convert to  data frame for easier display and analysis
+yieldsd <- yields %>% map_dfr(`[`, c("maxyield", "minyield", "meanyield"))
+
+
+```
+
+Plotting
+```{r}
+tmp<- yieldsd %>% gather(value = "value", key = "yield")
+ggplot(tmp, aes(yield, value,  col=yield)) +
+  geom_boxplot() +
+  labs(x = "yield",
+       y = "yield anomaly") +
+  facet_wrap(~yield, scales = "free")
+```
+
+```{r}
+ggplot(yieldsd, aes(maxyield)) +
+  # cummulative distribution (even distribution)
+  stat_ecdf()
+
+# facets for each yield type,  parameter combo
+tmp<- cbind.data.frame(yieldsd, parm)
+
+tmp2 <- tmp %>% 
+  gather(maxyield, minyield, meanyield, value = "yvalue", key = "yieldtype")
+
+tmp3 <- tmp2 %>% gather(-yvalue,-yieldtype, value = "parmvalue", key = "parm")
+
+ggplot(tmp3, aes(parmvalue, yvalue, col = yieldtype)) +
+  geom_point() + facet_wrap(~yieldtype*parm, scales = "free", ncol = 5)
+```
+
+# Compare PCC for a different output
+```{r}
+senresult_rank_min <- pcc(parm, yieldsd$minyield, rank = TRUE)
+senresult_rank_min
+
+
+senresult_rank_max <- pcc(parm, yieldsd$maxyield, rank = TRUE)
+senresult_rank_max
+
+
+senresult_rank_mean <- pcc(parm, yieldsd$meanyield, rank = TRUE)
+senresult_rank_mean
+
+tmp = cbind.data.frame(senresult_rank_min$PRCC, senresult_rank_max$PRCC, senresult_rank_mean$PRCC)
+colnames(tmp)=c("min", "max", "mean")
+tmp$parm = rownames(tmp)
+tmpp = tmp %>% gather(-parm, key = "output", value = "PRCC")
+
+ggplot(tmpp, aes(parm, PRCC, col=output))+geom_point(size=2)
+```
+
